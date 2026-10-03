@@ -34,15 +34,27 @@ export function Navbar({
     notifications,
     health,
     activeView,
+    resetDemoAcademicData,
   } = useTimetable();
 
-  const { currentUser, currentRole: authRole, logout } = useAuth();
+  const { currentUser, currentRole: authRole, logout, resetDemoData } = useAuth();
+  const [isResetting, setIsResetting] = React.useState(false);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleSignOut = () => {
     logout();
     onShowLoginPage();
+  };
+
+  const handleResetDemo = async () => {
+    setIsResetting(true);
+    try {
+      await resetDemoData();
+      resetDemoAcademicData();
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   const getViewTitle = () => {
@@ -107,6 +119,22 @@ export function Navbar({
 
       {/* Right: Health KPI + Notifications + Profile Button */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Public Demo Indicator & Reset Button */}
+        {currentUser?.isDemoUser && (
+          <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1 rounded-md bg-amber-950/40 border border-amber-800/60 text-[11px] text-amber-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+            <span className="font-medium hidden sm:inline">Public Demo</span>
+            <button
+              onClick={handleResetDemo}
+              disabled={isResetting}
+              className="text-[10px] text-amber-300 hover:text-white font-semibold underline transition-colors disabled:opacity-50"
+              title="Revert demo modifications and restore pristine demo dataset"
+            >
+              {isResetting ? 'Restoring...' : 'Reset Demo Data'}
+            </button>
+          </div>
+        )}
+
         {/* Schedule Health Pill (Desktop) */}
         <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-md bg-zinc-900/80 border border-zinc-800/80 text-[11px] text-zinc-300">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />

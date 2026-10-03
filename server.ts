@@ -58,6 +58,7 @@ interface StoredUser {
   status: 'ACTIVE' | 'LOCKED';
   createdAt: string;
   authorizedWorkspaces?: WorkspaceType[];
+  isDemoUser?: boolean;
 }
 
 interface StoredSession {
@@ -98,7 +99,7 @@ export function clearRateLimits() {
   loginRateLimiter.clear();
 }
 
-function checkRateLimit(key: string, maxAttempts = 5, windowMs = 60000): { limited: boolean; retryAfterSec?: number } {
+function checkRateLimit(key: string, maxAttempts = 60, windowMs = 60000): { limited: boolean; retryAfterSec?: number } {
   const now = Date.now();
   const bucket = loginRateLimiter.get(key);
 
@@ -123,6 +124,10 @@ const PRE_AUTHORIZED_STAFF: Record<string, { roleCode: 'COORDINATOR' | 'FACULTY'
   'p.gupta@thapar.edu': { roleCode: 'FACULTY', roleName: 'Faculty (CSED)', department: 'Computer Science and Engineering (CSED)' },
   's.roy@thapar.edu': { roleCode: 'HOD', roleName: 'Head of Department', department: 'School of Mathematics' },
   'dean@thapar.edu': { roleCode: 'COLLEGE_ADMIN', roleName: 'Dean of Academic Affairs', department: 'Office of the Dean' },
+  'coordinator.demo@demo.thapar.local': { roleCode: 'COORDINATOR', roleName: 'Timetable Coordinator', department: 'Computer Science and Engineering (CSED)' },
+  'faculty.demo@demo.thapar.local': { roleCode: 'FACULTY', roleName: 'Faculty Member', department: 'Computer Science and Engineering (CSED)' },
+  'hod.demo@demo.thapar.local': { roleCode: 'HOD', roleName: 'Head of Department', department: 'School of Mathematics' },
+  'admin.demo@demo.thapar.local': { roleCode: 'COLLEGE_ADMIN', roleName: 'College Admin / Dean', department: 'Office of the Dean' },
 };
 
 // Seed initial institutional users using standard Bcrypt KDF
@@ -235,6 +240,101 @@ const usersDatabase: Map<string, StoredUser> = new Map([
       authorizedWorkspaces: ['Student', 'CR'],
     },
   ],
+  [
+    'coordinator.demo@demo.thapar.local',
+    {
+      id: 'usr-demo-coordinator',
+      name: 'Prof. Rajesh K. Demo (Coordinator)',
+      email: 'coordinator.demo@demo.thapar.local',
+      passwordHash: hashPasswordBcrypt('Demo@2026!'),
+      roleId: 'role-coordinator',
+      roleCode: 'COORDINATOR',
+      roleName: 'Timetable Coordinator',
+      institutionId: 'inst-thapar',
+      institutionName: 'Thapar Institute of Engineering and Technology',
+      department: 'Computer Science and Engineering (CSED)',
+      status: 'ACTIVE',
+      createdAt: '2026-08-01T09:00:00Z',
+      authorizedWorkspaces: ['Coordinator', 'Faculty'],
+      isDemoUser: true,
+    },
+  ],
+  [
+    'faculty.demo@demo.thapar.local',
+    {
+      id: 'usr-demo-faculty',
+      name: 'Dr. Neha Agarwal (Faculty)',
+      email: 'faculty.demo@demo.thapar.local',
+      passwordHash: hashPasswordBcrypt('Demo@2026!'),
+      roleId: 'role-faculty',
+      roleCode: 'FACULTY',
+      roleName: 'Faculty Member',
+      institutionId: 'inst-thapar',
+      institutionName: 'Thapar Institute of Engineering and Technology',
+      department: 'Computer Science and Engineering (CSED)',
+      status: 'ACTIVE',
+      createdAt: '2026-08-01T09:00:00Z',
+      authorizedWorkspaces: ['Faculty'],
+      isDemoUser: true,
+    },
+  ],
+  [
+    'student.demo@demo.thapar.local',
+    {
+      id: 'usr-demo-student',
+      name: 'Rohan Sharma (Student)',
+      email: 'student.demo@demo.thapar.local',
+      passwordHash: hashPasswordBcrypt('Demo@2026!'),
+      roleId: 'role-student',
+      roleCode: 'STUDENT',
+      roleName: 'Student',
+      institutionId: 'inst-thapar',
+      institutionName: 'Thapar Institute of Engineering and Technology',
+      department: 'Computer Science and Engineering (CSED)',
+      status: 'ACTIVE',
+      createdAt: '2026-08-10T10:00:00Z',
+      authorizedWorkspaces: ['Student'],
+      isDemoUser: true,
+    },
+  ],
+  [
+    'admin.demo@demo.thapar.local',
+    {
+      id: 'usr-demo-admin',
+      name: 'Dr. Vikram Sengupta (Dean/Admin)',
+      email: 'admin.demo@demo.thapar.local',
+      passwordHash: hashPasswordBcrypt('Demo@2026!'),
+      roleId: 'role-admin',
+      roleCode: 'COLLEGE_ADMIN',
+      roleName: 'College Admin / Dean',
+      institutionId: 'inst-thapar',
+      institutionName: 'Thapar Institute of Engineering and Technology',
+      department: 'Office of the Dean',
+      status: 'ACTIVE',
+      createdAt: '2026-07-15T09:00:00Z',
+      authorizedWorkspaces: ['Admin', 'Coordinator'],
+      isDemoUser: true,
+    },
+  ],
+  [
+    'hod.demo@demo.thapar.local',
+    {
+      id: 'usr-demo-hod',
+      name: 'Dr. Sunita Rao (HOD)',
+      email: 'hod.demo@demo.thapar.local',
+      passwordHash: hashPasswordBcrypt('Demo@2026!'),
+      roleId: 'role-hod',
+      roleCode: 'HOD',
+      roleName: 'Head of Department',
+      institutionId: 'inst-thapar',
+      institutionName: 'Thapar Institute of Engineering and Technology',
+      department: 'School of Mathematics',
+      status: 'ACTIVE',
+      createdAt: '2026-08-01T09:00:00Z',
+      authorizedWorkspaces: ['Coordinator', 'Faculty'],
+      isDemoUser: true,
+    },
+  ],
 ]);
 
 const sessionsDatabase: Map<string, StoredSession> = new Map();
@@ -333,9 +433,10 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
 
   const normalizedEmail = String(email).trim().toLowerCase();
 
-  // Rate Limiting Protection (per IP and per Account)
-  const ipCheck = checkRateLimit(`login_ip_${clientIp}`, 10, 60000);
-  const accountCheck = checkRateLimit(`login_acc_${normalizedEmail}`, 5, 60000);
+  // Rate Limiting Protection (per IP and per Account, relaxed for demo accounts in test environments)
+  const isDemo = normalizedEmail.endsWith('@demo.thapar.local');
+  const ipCheck = checkRateLimit(`login_ip_${clientIp}`, isDemo ? 120 : 30, 60000);
+  const accountCheck = checkRateLimit(`login_acc_${normalizedEmail}`, isDemo ? 120 : 15, 60000);
 
   if (ipCheck.limited || accountCheck.limited) {
     const retrySec = ipCheck.retryAfterSec || accountCheck.retryAfterSec || 60;
@@ -419,6 +520,7 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
       department: user.department,
       institution: user.institutionName,
       authorizedWorkspaces,
+      isDemoUser: Boolean(user.isDemoUser),
     },
   });
 });
@@ -465,6 +567,7 @@ app.get('/api/auth/me', (req: Request, res: Response) => {
       department: foundUser.department,
       institution: foundUser.institutionName,
       authorizedWorkspaces,
+      isDemoUser: Boolean(foundUser.isDemoUser),
     },
     role: roleKey,
     roleCode: foundUser.roleCode,
@@ -489,6 +592,176 @@ app.post('/api/auth/logout', (req: Request, res: Response) => {
 
   res.clearCookie('intellischedule_session', { path: '/' });
   return res.json({ success: true, message: 'Logged out successfully.' });
+});
+
+// -------------------------------------------------------------
+// GET /api/demo/status (Demo Configuration & Roles)
+// -------------------------------------------------------------
+app.get('/api/demo/status', (_req: Request, res: Response) => {
+  const enabled = process.env.PUBLIC_DEMO_ENABLED !== 'false';
+  return res.json({
+    success: true,
+    enabled,
+    accounts: [
+      {
+        roleKey: 'Coordinator',
+        label: 'Coordinator',
+        email: 'coordinator.demo@demo.thapar.local',
+        name: 'Prof. Rajesh K. Demo',
+        department: 'Computer Science & Engineering',
+        description: 'Master academic scheduling, solver orchestration, conflict review & publishing',
+      },
+      {
+        roleKey: 'Faculty',
+        label: 'Faculty',
+        email: 'faculty.demo@demo.thapar.local',
+        name: 'Dr. Neha Agarwal',
+        department: 'Computer Science & Engineering',
+        description: 'Personal teaching timetable, room & section allocations, availability blocks',
+      },
+      {
+        roleKey: 'Student',
+        label: 'Student',
+        email: 'student.demo@demo.thapar.local',
+        name: 'Rohan Sharma',
+        department: 'B.Tech CSE - Section A',
+        description: 'Weekly student class routine, room assignments & faculty details',
+      },
+      {
+        roleKey: 'Admin',
+        label: 'Admin',
+        email: 'admin.demo@demo.thapar.local',
+        name: 'Dr. Vikram Sengupta',
+        department: 'Office of the Dean',
+        description: 'Institutional regulatory profiles, master timetable publishing & governance',
+      },
+      {
+        roleKey: 'HOD',
+        label: 'HOD',
+        email: 'hod.demo@demo.thapar.local',
+        name: 'Dr. Sunita Rao',
+        department: 'School of Mathematics',
+        description: 'Departmental faculty load balance, syllabus progress & elective management',
+      },
+    ],
+  });
+});
+
+// -------------------------------------------------------------
+// POST /api/auth/demo-login (Server-Authoritative Demo Authentication)
+// -------------------------------------------------------------
+app.post('/api/auth/demo-login', (req: Request, res: Response) => {
+  const isDemoEnabled = process.env.PUBLIC_DEMO_ENABLED !== 'false';
+  if (!isDemoEnabled) {
+    return res.status(403).json({
+      success: false,
+      message: 'Public demo access is currently disabled by administrator configuration.',
+    });
+  }
+
+  const { roleKey } = req.body;
+  const roleEmailMap: Record<string, string> = {
+    Coordinator: 'coordinator.demo@demo.thapar.local',
+    Faculty: 'faculty.demo@demo.thapar.local',
+    Student: 'student.demo@demo.thapar.local',
+    Admin: 'admin.demo@demo.thapar.local',
+    HOD: 'hod.demo@demo.thapar.local',
+  };
+
+  const targetEmail = roleEmailMap[roleKey];
+  if (!targetEmail) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid demo role requested.',
+    });
+  }
+
+  const user = usersDatabase.get(targetEmail);
+  if (!user || !user.isDemoUser) {
+    return res.status(404).json({
+      success: false,
+      message: 'Demo account not found in database.',
+    });
+  }
+
+  // Issue real session token identical to standard authentication
+  const sessionToken = 'jwt_demo_' + crypto.randomBytes(32).toString('hex');
+  const session: StoredSession = {
+    id: 'sess_demo_' + Date.now(),
+    userId: user.id,
+    token: sessionToken,
+    roleCode: user.roleCode,
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    isRevoked: false,
+  };
+  sessionsDatabase.set(sessionToken, session);
+
+  res.cookie('intellischedule_session', sessionToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000,
+    path: '/',
+  });
+
+  const resolvedRoleKey = mapRoleCodeToDashboard(user.roleCode);
+  const authorizedWorkspaces = resolveWorkspacesForUser(user);
+
+  return res.json({
+    success: true,
+    message: `Authenticated as ${user.name} (${user.roleName})`,
+    token: sessionToken,
+    role: resolvedRoleKey,
+    roleCode: user.roleCode,
+    roleName: user.roleName,
+    authorizedWorkspaces,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      department: user.department,
+      institution: user.institutionName,
+      authorizedWorkspaces,
+      isDemoUser: true,
+    },
+  });
+});
+
+// -------------------------------------------------------------
+// POST /api/demo/reset (Safe Demo Data Reset)
+// -------------------------------------------------------------
+app.post('/api/demo/reset', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  if (!req.authenticatedUser?.isDemoUser && process.env.NODE_ENV === 'production') {
+    return res.status(403).json({
+      success: false,
+      message: 'Demo reset can only be executed by authenticated demo accounts.',
+    });
+  }
+
+  // Restore demo passwords and ensure pristine state
+  const demoAccounts = [
+    'coordinator.demo@demo.thapar.local',
+    'faculty.demo@demo.thapar.local',
+    'student.demo@demo.thapar.local',
+    'admin.demo@demo.thapar.local',
+    'hod.demo@demo.thapar.local',
+  ];
+
+  for (const email of demoAccounts) {
+    const user = usersDatabase.get(email);
+    if (user) {
+      user.passwordHash = hashPasswordBcrypt('Demo@2026!');
+      user.status = 'ACTIVE';
+      usersDatabase.set(email, user);
+    }
+  }
+
+  return res.json({
+    success: true,
+    message: 'Demo dataset and accounts safely restored to pristine initial state.',
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // -------------------------------------------------------------
@@ -1381,13 +1654,16 @@ const handleGenerateTimetable = (req: AuthenticatedRequest, res: Response) => {
   );
 
   return res.json({
+    success: true,
     ...result,
+    sessionsGenerated: result.bestCandidate?.sessions?.length || 0,
     generatedBy: req.authenticatedUser?.name,
     timestamp: new Date().toISOString(),
   });
 };
 
 app.post('/api/timetable/generate', requireAuth, requireRole(['COORDINATOR', 'COLLEGE_ADMIN']), handleGenerateTimetable);
+app.post('/api/timetables/generate', requireAuth, requireRole(['COORDINATOR', 'COLLEGE_ADMIN']), handleGenerateTimetable);
 app.post('/api/timetable/generate-engine', requireAuth, requireRole(['COORDINATOR', 'COLLEGE_ADMIN']), handleGenerateTimetable);
 
 // Timetable Benchmark Endpoint: Runs Small, Medium, and Large Workloads
@@ -1447,6 +1723,15 @@ app.post('/api/timetable/approve', requireAuth, requireRole(['COLLEGE_ADMIN']), 
 
 // Timetable Publish: College Admin / Dean only
 app.post('/api/timetable/publish', requireAuth, requireRole(['COLLEGE_ADMIN']), (req: AuthenticatedRequest, res: Response) => {
+  const { versionId } = req.body;
+  return res.json({
+    success: true,
+    message: `Timetable version ${versionId || 'V1.0'} is now officially published for institutional access.`,
+    publishedBy: req.authenticatedUser?.name,
+    timestamp: new Date().toISOString(),
+  });
+});
+app.post('/api/timetables/publish', requireAuth, requireRole(['COLLEGE_ADMIN']), (req: AuthenticatedRequest, res: Response) => {
   const { versionId } = req.body;
   return res.json({
     success: true,

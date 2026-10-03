@@ -30,6 +30,7 @@ export function LoginPageView({ onSuccessLogin }: LoginPageViewProps) {
     login,
     register,
     loginWithGoogle,
+    loginAsDemoRole,
     requestPasswordReset,
     resetPassword
   } = useAuth();
@@ -67,8 +68,32 @@ export function LoginPageView({ onSuccessLogin }: LoginPageViewProps) {
   // Status & Loading States
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [demoRoleLoading, setDemoRoleLoading] = useState<string | null>(null);
+  const [showDemoModal, setShowDemoModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const handleDemoLoginClick = async (
+    roleKey: 'Coordinator' | 'Faculty' | 'Student' | 'HOD' | 'Admin'
+  ) => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setDemoRoleLoading(roleKey);
+
+    try {
+      const res = await loginAsDemoRole(roleKey);
+      setDemoRoleLoading(null);
+      if (res.success && res.authorizedWorkspaces) {
+        setSuccessMessage(`Authenticated as ${roleKey} (Public Demo)`);
+        onSuccessLogin?.(res.authorizedWorkspaces);
+      } else {
+        setErrorMessage(res.message || 'Failed to authenticate demo account.');
+      }
+    } catch {
+      setDemoRoleLoading(null);
+      setErrorMessage('Network error during demo authentication.');
+    }
+  };
 
   // Check URL parameters for OAuth errors or completed callbacks on mount
   useEffect(() => {
@@ -581,6 +606,116 @@ export function LoginPageView({ onSuccessLogin }: LoginPageViewProps) {
               )}
             </button>
 
+            {/* Demo access section */}
+            <div className="mt-6 pt-5 border-t border-zinc-800/80">
+              <div className="flex items-center justify-between mb-2.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  <span className="text-xs font-semibold text-zinc-200">Demo access</span>
+                  <span className="text-[10px] text-amber-400/90 font-mono bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-900/40">
+                    Public Demo
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDemoModal(true)}
+                  className="text-[11px] text-zinc-400 hover:text-zinc-200 underline transition-colors"
+                >
+                  Account details
+                </button>
+              </div>
+              <p className="text-[11px] text-zinc-400 mb-3 leading-relaxed">
+                Demo account — data is for testing only. Click a role to authenticate immediately:
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDemoLoginClick('Coordinator')}
+                  disabled={Boolean(demoRoleLoading) || isLoading || isGoogleLoading}
+                  className="p-2.5 bg-zinc-950 hover:bg-zinc-850 active:bg-zinc-800 disabled:opacity-50 text-left border border-zinc-800 hover:border-zinc-700 rounded-xl transition-all flex flex-col gap-0.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-semibold text-zinc-200 group-hover:text-white transition-colors">Continue as Coordinator</span>
+                    {demoRoleLoading === 'Coordinator' ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-400" />
+                    ) : (
+                      <ArrowRight className="h-3 w-3 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+                    )}
+                  </div>
+                  <span className="text-[10px] text-zinc-400">Full solver, rules & publishing</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDemoLoginClick('Faculty')}
+                  disabled={Boolean(demoRoleLoading) || isLoading || isGoogleLoading}
+                  className="p-2.5 bg-zinc-950 hover:bg-zinc-850 active:bg-zinc-800 disabled:opacity-50 text-left border border-zinc-800 hover:border-zinc-700 rounded-xl transition-all flex flex-col gap-0.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-semibold text-zinc-200 group-hover:text-white transition-colors">Continue as Faculty</span>
+                    {demoRoleLoading === 'Faculty' ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-400" />
+                    ) : (
+                      <ArrowRight className="h-3 w-3 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+                    )}
+                  </div>
+                  <span className="text-[10px] text-zinc-400">Teaching routine & room schedule</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDemoLoginClick('Student')}
+                  disabled={Boolean(demoRoleLoading) || isLoading || isGoogleLoading}
+                  className="p-2.5 bg-zinc-950 hover:bg-zinc-850 active:bg-zinc-800 disabled:opacity-50 text-left border border-zinc-800 hover:border-zinc-700 rounded-xl transition-all flex flex-col gap-0.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-semibold text-zinc-200 group-hover:text-white transition-colors">Continue as Student</span>
+                    {demoRoleLoading === 'Student' ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-400" />
+                    ) : (
+                      <ArrowRight className="h-3 w-3 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+                    )}
+                  </div>
+                  <span className="text-[10px] text-zinc-400">Weekly classes & course details</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDemoLoginClick('Admin')}
+                  disabled={Boolean(demoRoleLoading) || isLoading || isGoogleLoading}
+                  className="p-2.5 bg-zinc-950 hover:bg-zinc-850 active:bg-zinc-800 disabled:opacity-50 text-left border border-zinc-800 hover:border-zinc-700 rounded-xl transition-all flex flex-col gap-0.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-semibold text-zinc-200 group-hover:text-white transition-colors">Continue as Admin</span>
+                    {demoRoleLoading === 'Admin' ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-400" />
+                    ) : (
+                      <ArrowRight className="h-3 w-3 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+                    )}
+                  </div>
+                  <span className="text-[10px] text-zinc-400">Dean office & master approvals</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDemoLoginClick('HOD')}
+                  disabled={Boolean(demoRoleLoading) || isLoading || isGoogleLoading}
+                  className="sm:col-span-2 p-2.5 bg-zinc-950 hover:bg-zinc-850 active:bg-zinc-800 disabled:opacity-50 text-left border border-zinc-800 hover:border-zinc-700 rounded-xl transition-all flex flex-col gap-0.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-semibold text-zinc-200 group-hover:text-white transition-colors">Continue as HOD</span>
+                    {demoRoleLoading === 'HOD' ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-400" />
+                    ) : (
+                      <ArrowRight className="h-3 w-3 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+                    )}
+                  </div>
+                  <span className="text-[10px] text-zinc-400">Department load balance & syllabus tracking</span>
+                </button>
+              </div>
+            </div>
+
             {/* Bottom Register Switcher Link */}
             <div className="mt-6 pt-5 border-t border-zinc-800/80 text-center text-xs text-zinc-400">
               Don't have an account?{' '}
@@ -990,6 +1125,92 @@ export function LoginPageView({ onSuccessLogin }: LoginPageViewProps) {
       <div className="mt-6 text-center text-xs text-zinc-500">
         Thapar Institute of Engineering & Technology · Patiala, Punjab
       </div>
+
+      {/* Demo Information Modal */}
+      {showDemoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-amber-400" />
+                <div>
+                  <h3 className="text-sm font-bold text-white">Public Demo Directory</h3>
+                  <p className="text-[11px] text-zinc-400">Pre-seeded accounts for independent review</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDemoModal(false)}
+                className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-900/50 text-[11px] text-amber-200/90 leading-relaxed">
+                <span className="font-semibold text-amber-300">Shared Demo Password:</span>{' '}
+                <code className="bg-zinc-950 px-1.5 py-0.5 rounded font-mono text-white border border-amber-800/40">Demo@2026!</code>{' '}
+                <span className="text-zinc-400">(Or click any one-click demo button to sign in directly).</span>
+              </div>
+
+              <div className="space-y-2">
+                <div className="p-3 bg-zinc-950 rounded-xl border border-zinc-800/80 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-zinc-200">Coordinator</span>
+                    <span className="text-[10px] font-mono text-zinc-400">coordinator.demo@demo.thapar.local</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400">Full academic scheduling, CP-SAT solver, conflict diagnosis & master publish.</p>
+                </div>
+
+                <div className="p-3 bg-zinc-950 rounded-xl border border-zinc-800/80 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-zinc-200">Faculty</span>
+                    <span className="text-[10px] font-mono text-zinc-400">faculty.demo@demo.thapar.local</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400">Faculty personal routine, class cancellation, substitute cover & availability.</p>
+                </div>
+
+                <div className="p-3 bg-zinc-950 rounded-xl border border-zinc-800/80 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-zinc-200">Student</span>
+                    <span className="text-[10px] font-mono text-zinc-400">student.demo@demo.thapar.local</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400">Weekly student schedule, room numbers, faculty info & syllabus tracking.</p>
+                </div>
+
+                <div className="p-3 bg-zinc-950 rounded-xl border border-zinc-800/80 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-zinc-200">College Admin / Dean</span>
+                    <span className="text-[10px] font-mono text-zinc-400">admin.demo@demo.thapar.local</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400">UGC academic calendar, regulatory workload limits & master publication approval.</p>
+                </div>
+
+                <div className="p-3 bg-zinc-950 rounded-xl border border-zinc-800/80 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-zinc-200">Head of Department (HOD)</span>
+                    <span className="text-[10px] font-mono text-zinc-400">hod.demo@demo.thapar.local</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400">Department load balance, elective allocation & syllabus progress oversight.</p>
+                </div>
+              </div>
+
+              <div className="text-[11px] text-zinc-500 leading-relaxed border-t border-zinc-800/60 pt-2.5">
+                🔒 Security Note: Demo accounts use the application's real bcrypt password hashing and server-authoritative RBAC. Data modifications can be reverted anytime with the <strong className="text-zinc-400">Reset Demo Data</strong> button in the top navigation bar.
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowDemoModal(false)}
+              className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold rounded-xl transition-colors"
+            >
+              Close Directory
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

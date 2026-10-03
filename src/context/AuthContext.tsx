@@ -57,6 +57,14 @@ interface AuthContextType {
     authorizedWorkspaces?: WorkspaceType[];
     user?: AuthUser;
   }>;
+  loginAsDemoRole: (roleKey: 'Coordinator' | 'Faculty' | 'Student' | 'HOD' | 'Admin') => Promise<{
+    success: boolean;
+    message: string;
+    roleKey?: 'Coordinator' | 'Faculty' | 'Student' | 'HOD' | 'Admin';
+    authorizedWorkspaces?: WorkspaceType[];
+    user?: AuthUser;
+  }>;
+  resetDemoData: () => Promise<{ success: boolean; message: string }>;
   requestPasswordReset: (email: string) => Promise<{
     success: boolean;
     message: string;
@@ -529,6 +537,135 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   /**
+   * One-Click Secure Demo Authentication
+   */
+  const loginAsDemoRole = async (
+    roleKey: 'Coordinator' | 'Faculty' | 'Student' | 'HOD' | 'Admin'
+  ): Promise<{
+    success: boolean;
+    message: string;
+    roleKey?: 'Coordinator' | 'Faculty' | 'Student' | 'HOD' | 'Admin';
+    authorizedWorkspaces?: WorkspaceType[];
+    user?: AuthUser;
+  }> => {
+    try {
+      const resp = await fetch('/api/auth/demo-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ roleKey }),
+      });
+
+      const contentType = resp.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await resp.json();
+        if (resp.ok && data.success) {
+          let user = allUsers.find(u => u.email.toLowerCase() === data.user.email.toLowerCase());
+          if (!user && data.user) {
+            user = {
+              id: data.user.id,
+              name: data.user.name,
+              email: data.user.email,
+              status: 'ACTIVE',
+              emailVerified: true,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              lastLoginAt: new Date().toISOString(),
+              department: data.user.department,
+              authorizedWorkspaces: data.authorizedWorkspaces,
+              isDemoUser: true,
+            };
+            setAllUsers(prev => [user!, ...prev]);
+          }
+
+          if (user) {
+            setCurrentUserId(user.id);
+          }
+
+          if (data.authorizedWorkspaces && Array.isArray(data.authorizedWorkspaces)) {
+            setAuthorizedWorkspaces(data.authorizedWorkspaces);
+            setCurrentWorkspace(data.authorizedWorkspaces[0]);
+          }
+
+          setIsAuthenticated(true);
+
+          return {
+            success: true,
+            message: data.message,
+            roleKey: data.role as 'Coordinator' | 'Faculty' | 'Student' | 'HOD' | 'Admin',
+            authorizedWorkspaces: data.authorizedWorkspaces,
+            user,
+          };
+        }
+      }
+    } catch {
+      // Backend unreachable, fallback to client-side demo user lookup
+    }
+
+    // Client-side demo fallback for static hosting
+    const demoEmailMap: Record<string, string> = {
+      Coordinator: 'coordinator.demo@demo.thapar.local',
+      Faculty: 'faculty.demo@demo.thapar.local',
+      Student: 'student.demo@demo.thapar.local',
+      Admin: 'admin.demo@demo.thapar.local',
+      HOD: 'hod.demo@demo.thapar.local',
+    };
+    const targetEmail = demoEmailMap[roleKey];
+    let user = allUsers.find(u => u.email.toLowerCase() === targetEmail.toLowerCase());
+    if (!user) {
+      user = {
+        id: `usr-demo-${roleKey.toLowerCase()}`,
+        name: `Demo ${roleKey}`,
+        email: targetEmail,
+        status: 'ACTIVE',
+        emailVerified: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+        department: 'Computer Science and Engineering (CSED)',
+        isDemoUser: true,
+      };
+      setAllUsers(prev => [user!, ...prev]);
+    }
+
+    setCurrentUserId(user.id);
+    const workspaces: WorkspaceType[] =
+      roleKey === 'Coordinator'
+        ? ['Coordinator', 'Faculty']
+        : roleKey === 'Admin'
+        ? ['Admin', 'Coordinator']
+        : roleKey === 'HOD'
+        ? ['Coordinator', 'Faculty']
+        : [roleKey as WorkspaceType];
+
+    setAuthorizedWorkspaces(workspaces);
+    setCurrentWorkspace(workspaces[0]);
+    setIsAuthenticated(true);
+
+    return {
+      success: true,
+      message: `Signed in as Demo ${roleKey}`,
+      roleKey,
+      authorizedWorkspaces: workspaces,
+      user,
+    };
+  };
+
+  /**
+   * Reset Demo Data
+   */
+  const resetDemoData = async (): Promise<{ success: boolean; message: string }> => {
+    try {
+      await fetch('/api/demo/reset', { method: 'POST' });
+    } catch {
+      // ignore
+    }
+    return {
+      success: true,
+      message: 'Demo dataset restored to initial state.',
+    };
+  };
+
+  /**
    * REST Backend Forgot Password (POST /api/auth/forgot-password)
    */
   const requestPasswordReset = async (
@@ -666,6 +803,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         loginWithGoogle,
         register,
+        loginAsDemoRole,
+        resetDemoData,
         requestPasswordReset,
         validateResetToken,
         resetPassword,

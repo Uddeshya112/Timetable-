@@ -379,6 +379,7 @@ export interface AuthUser {
   ssoProvider?: string;
   ipAddress?: string;
   authorizedWorkspaces?: WorkspaceType[];
+  isDemoUser?: boolean;
   notificationPreferences?: {
     email: boolean;
     inApp: boolean;

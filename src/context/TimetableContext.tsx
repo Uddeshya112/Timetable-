@@ -168,6 +168,7 @@ interface TimetableContextType {
 
   // Validation & Generation Engine
   runValidation: () => ValidationReport;
+  resetDemoAcademicData: () => void;
   generateDraftTimetable: () => {
     isSuccess: boolean;
     sessionsGenerated: number;
@@ -614,6 +615,26 @@ export function TimetableProvider({ children }: { children: React.ReactNode }) {
       },
       ...prev,
     ]);
+  };
+
+  const resetDemoAcademicData = () => {
+    setAcademicYear(INITIAL_ACADEMIC_YEAR);
+    setDepartments(DEPARTMENTS);
+    setPrograms(PROGRAMS);
+    setRooms(ROOMS);
+    setFacultyMembers(FACULTY_MEMBERS);
+    setSections(SECTIONS);
+    setCourses(COURSES);
+    setAllocations(INITIAL_ALLOCATIONS);
+    setConstraints(INITIAL_CONSTRAINTS);
+    setSessions(INITIAL_SESSIONS);
+    setMakeupTasks(INITIAL_MAKEUP_TASKS);
+    setRecoveryOpportunities(INITIAL_RECOVERY_OPPORTUNITIES);
+    setPolls(INITIAL_POLLS);
+    setNotifications(INITIAL_NOTIFICATIONS);
+    setVersions(INITIAL_VERSIONS);
+    setWhatIfSimulation(INITIAL_WHAT_IF_SIMULATION);
+    setPublishStatus('Published');
   };
 
   // Bulk Import Helper
@@ -1180,6 +1201,7 @@ export function TimetableProvider({ children }: { children: React.ReactNode }) {
         updateConstraint,
         toggleConstraint,
         runValidation,
+        resetDemoAcademicData,
         generateDraftTimetable,
         updatePublishStatus,
         bulkImportData,
