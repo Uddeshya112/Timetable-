@@ -1,0 +1,8 @@
+{
+  "name": "IntelliSchedule",
+  "description": "Intelligent Academic Scheduling & Self-Healing Platform with dynamic recovery, constraint optimization, and interactive multi-role dashboards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
